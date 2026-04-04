@@ -10,7 +10,7 @@ st.set_page_config(page_title="Diamond Dawg Tracker", layout="wide")
 
 st.title("Diamond Dawg Tracker")
 st.markdown(
-    "Recent game logs and season stats YTD for all Diamond Dawgs alumni who "
+    "Recent game logs and season stats YTD for all Diamond Dawg alumni who "
     "have played in 2026. Sorted by level and alphabetically by last name."
 )
 
