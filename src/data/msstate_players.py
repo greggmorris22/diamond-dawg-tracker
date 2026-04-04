@@ -1,17 +1,18 @@
 """
 Static list of Mississippi State University alumni who were drafted into
-professional baseball (2018-2025). Each entry is a (display_name, mlb_id)
-tuple. Because IDs are known up front, the app bypasses name search entirely
+professional baseball. Each entry is a (display_name, mlb_id) tuple.
+Because IDs are known up front, the app bypasses name search entirely
 — no wrong-player mismatches possible.
 
-Players who have since reached MLB or retired will return no MiLB stats
-and are silently skipped by the app.
-
 Source: MLB Stats API draft endpoint, school = Mississippi State University.
-Last updated: 2026-04-03.
+Last updated: 2026-04-04.
 """
 
 MSU_PLAYERS = [
+    # Pre-2018 (added manually — still active as of 2026)
+    ("Brandon Woodruff",    605540),
+    ("Nathaniel Lowe",      663993),
+    ("Brent Rooker",        667670),
     # 2018
     ("Konnor Pilkington",   663455),
     ("J.P. France",         641585),
