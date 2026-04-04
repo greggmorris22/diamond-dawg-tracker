@@ -1,25 +1,47 @@
 """
-Static list of Mississippi State University alumni who were drafted into
-professional baseball. Each entry is a (display_name, mlb_id) tuple.
-Because IDs are known up front, the app bypasses name search entirely
-— no wrong-player mismatches possible.
+Complete list of Mississippi State University alumni drafted into professional
+baseball from 2014 through 2025. Each entry is a (display_name, mlb_id) tuple.
+
+Because IDs are known up front, the app bypasses name-search entirely —
+no wrong-player mismatches possible.
+
+The app dynamically filters this list at runtime: only players with active
+2026 regular-season stats (at any level) are displayed. Players who are
+retired, injured, or otherwise inactive return no stats and are silently
+skipped.
 
 Source: MLB Stats API draft endpoint, school = Mississippi State University.
 Last updated: 2026-04-04.
 """
 
 MSU_PLAYERS = [
-    # Pre-2018 (added manually — still active as of 2026)
+    # 2014
+    ("Jacob Lindgren",      605338),
+    ("Jonathan Holder",     656547),
     ("Brandon Woodruff",    605540),
+    ("Brett Pirtle",        657720),
+    # 2015 — no MSU picks found in API
+    # 2016
+    ("Dakota Hudson",       641712),
+    ("Reid Humphreys",      641714),
+    ("Daniel Brown",        667681),
+    ("Jacob Robson",        615699),
+    ("Zac Houston",         667677),
     ("Nathaniel Lowe",      663993),
+    ("Gavin Collins",       641468),
+    ("Vance Tatum",         667673),
+    ("Austin Sexton",       642063),
+    ("Jack Kruger",         667674),
     ("Brent Rooker",        667670),
+    # 2017
+    ("Ryan Gridley",        667667),
+    ("Jake Mangum",         663968),
     # 2018
     ("Konnor Pilkington",   663455),
     ("J.P. France",         641585),
     ("Hunter Stovall",      667663),
     ("Ethan Small",         663629),
     ("Zach Neff",           679820),
-    ("Jake Mangum",         663968),
     ("Jacob Billingsley",   667679),
     # 2019
     ("Colby White",         686831),
