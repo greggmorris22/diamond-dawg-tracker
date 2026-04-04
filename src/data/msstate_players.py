@@ -1,6 +1,6 @@
 """
 Complete list of Mississippi State University alumni drafted into professional
-baseball from 2014 through 2025. Each entry is a (display_name, mlb_id) tuple.
+baseball from 2013 through 2025. Each entry is a (display_name, mlb_id) tuple.
 
 Because IDs are known up front, the app bypasses name-search entirely —
 no wrong-player mismatches possible.
@@ -15,6 +15,14 @@ Last updated: 2026-04-04.
 """
 
 MSU_PLAYERS = [
+    # 2013
+    ("Hunter Renfroe",      592669),
+    ("Adam Frazier",        624428),
+    ("Kendall Graveman",    608665),
+    ("Chad Girodo",         643325),
+    ("Evan Mitchell",       641887),
+    ("Daryl Norris",        643470),
+    ("Luis Pollorena",      643490),
     # 2014
     ("Jacob Lindgren",      605338),
     ("Jonathan Holder",     656547),
