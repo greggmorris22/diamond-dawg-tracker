@@ -43,7 +43,7 @@ for i, (player_name, player_id) in enumerate(MSU_PLAYERS):
 progress.empty()
 
 if not results:
-    st.info("No active stats found for any MSU alumni at this time.")
+    st.info("No active stats found for any Diamond Dawg at this time.")
 else:
     # Sort: MLB first, then by level, then alphabetically by last name within each level
     results.sort(key=lambda r: (LEVEL_ORDER.get(r[2], 99), r[1]))
