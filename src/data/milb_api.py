@@ -1,8 +1,7 @@
 """
-MLB Stats API helpers for fetching MiLB game logs and season stats.
-Identical in behavior to the LORG Prospect Tracker version, with one
-difference: get_milb_stats() requires a player_id — name search is not
-used because all MSU alumni IDs are known up front.
+MLB Stats API helpers for fetching game logs and season stats.
+Covers both MiLB and MLB levels so Diamond Dawg Tracker can show
+active players at every level.
 """
 
 import urllib.request
@@ -153,27 +152,44 @@ def format_pitching_stats(splits: list, season_stat: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def get_milb_stats(player_id: int) -> pd.DataFrame:
+# Priority order for display: MLB first, then down through the minors.
+# The Lvl abbreviations come from sport.abbreviation in the API response.
+LEVEL_ORDER = {
+    "MLB": 0,
+    "AAA": 1,
+    "AA":  2,
+    "A+":  3,
+    "A":   4,
+    "Rk":  5,
+    "DSL": 6,
+    "VSL": 7,
+}
+
+
+def get_stats(player_id: int) -> tuple:
     """
-    Fetch 2026 MiLB regular-season game logs and season stats for the given
-    MLB Stats API player ID. Returns None if the player has no active MiLB
-    stats (e.g. they are in MLB, injured, or retired).
+    Fetch 2026 regular-season game logs and season stats for the given player.
+    Covers MLB (sportId=1) and all MiLB levels (11-17).
+
+    Returns (df, current_level) where current_level is the sport abbreviation
+    of the player's most recent game (used for sorting in the app).
+    Returns (None, None) if the player has no 2026 regular-season stats.
 
     sport_ids:
+        1  = MLB
         11 = AAA, 12 = AA, 13 = A+, 14 = A,
         15 = Rookie Complex, 16 = DSL, 17 = VSL
     """
-    # Determine position (hitter vs pitcher) from the player profile
     profile_url = f"https://statsapi.mlb.com/api/v1/people/{player_id}"
     profile = fetch_stats(profile_url)
     if not profile or not profile.get('people'):
-        return None
+        return None, None
 
     pos_code = profile['people'][0].get('primaryPosition', {}).get('code', '')
     is_pitcher = (pos_code == '1')
     group = "pitching" if is_pitcher else "hitting"
     year = 2026
-    sport_ids = [11, 12, 13, 14, 15, 16, 17]
+    sport_ids = [1, 11, 12, 13, 14, 15, 16, 17]
 
     def fetch_level(sid):
         url = (
@@ -186,7 +202,7 @@ def get_milb_stats(player_id: int) -> pd.DataFrame:
     all_splits = []
     best_season_stat = {}
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
         futures = {executor.submit(fetch_level, sid): sid for sid in sport_ids}
         for future in concurrent.futures.as_completed(futures):
             res = future.result()
@@ -202,9 +218,13 @@ def get_milb_stats(player_id: int) -> pd.DataFrame:
                             best_season_stat = new_stat
 
     if not all_splits:
-        return None
+        return None, None
+
+    # Determine current level from the most recent game
+    all_splits.sort(key=lambda x: x['date'], reverse=True)
+    current_level = all_splits[0].get('sport', {}).get('abbreviation', 'UNK')
 
     if is_pitcher:
-        return format_pitching_stats(all_splits, best_season_stat)
+        return format_pitching_stats(all_splits, best_season_stat), current_level
     else:
-        return format_hitting_stats(all_splits, best_season_stat)
+        return format_hitting_stats(all_splits, best_season_stat), current_level

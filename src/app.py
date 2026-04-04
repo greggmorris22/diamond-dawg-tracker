@@ -3,16 +3,17 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 import streamlit as st
-from data.milb_api import get_milb_stats
+from data.milb_api import get_stats, LEVEL_ORDER
 from data.msstate_players import MSU_PLAYERS
 
-st.set_page_config(page_title="MSU MiLB Tracker", layout="wide")
+st.set_page_config(page_title="Diamond Dawg Tracker", layout="wide")
 
-st.title("MSU MiLB Tracker")
+st.title("Diamond Dawg Tracker")
 st.markdown(
-    "Last 7 minor league game logs and 2026 season stats YTD for "
-    "Mississippi State University alumni currently active in MiLB. "
-    "Players who have reached MLB or are no longer active are automatically excluded."
+    "2026 game logs and season stats YTD for Mississippi State University "
+    "alumni currently active in professional baseball. MLB players appear "
+    "first, followed by MiLB levels. Within each level, players are sorted "
+    "alphabetically by last name."
 )
 
 # Column config shared by all stat tables. Renders the Date column as a
@@ -26,21 +27,34 @@ STAT_COLUMN_CONFIG = {
     )
 }
 
-found_any = False
+# Fetch stats for all players, collect results for sorting
+results = []
 
-for player_name, player_id in MSU_PLAYERS:
-    with st.spinner(f"Checking {player_name}..."):
-        stats_df = get_milb_stats(player_id)
+progress = st.progress(0, text="Loading Diamond Dawgs...")
+total = len(MSU_PLAYERS)
 
+for i, (player_name, player_id) in enumerate(MSU_PLAYERS):
+    progress.progress((i + 1) / total, text=f"Checking {player_name}...")
+    stats_df, current_level = get_stats(player_id)
     if stats_df is not None and not stats_df.empty:
-        found_any = True
-        st.subheader(player_name)
+        last_name = player_name.split()[-1]
+        results.append((player_name, last_name, current_level, stats_df))
+
+progress.empty()
+
+if not results:
+    st.info("No active stats found for any MSU alumni at this time.")
+else:
+    # Sort: MLB first, then by level, then alphabetically by last name within each level
+    results.sort(key=lambda r: (LEVEL_ORDER.get(r[2], 99), r[1]))
+
+    st.success(f"Found {len(results)} active Diamond Dawgs.")
+
+    for player_name, _, current_level, stats_df in results:
+        st.subheader(f"{player_name}  —  {current_level}")
         st.dataframe(
             stats_df,
             use_container_width=True,
             hide_index=True,
             column_config=STAT_COLUMN_CONFIG
         )
-
-if not found_any:
-    st.info("No active MiLB stats found for any MSU alumni at this time.")
