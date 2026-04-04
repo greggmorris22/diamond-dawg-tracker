@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+
+# macOS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+
+# Streamlit secrets (never commit — set in Streamlit Cloud dashboard)
+.streamlit/secrets.toml
+src/.streamlit/secrets.toml
