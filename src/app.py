@@ -3,6 +3,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 import streamlit as st
+import concurrent.futures
 from data.milb_api import get_stats, LEVEL_ORDER
 from data.msstate_players import MSU_PLAYERS
 
@@ -25,25 +26,32 @@ STAT_COLUMN_CONFIG = {
     )
 }
 
-# Fetch stats for all players, collect results for sorting
-results = []
 
-progress = st.progress(0, text="Loading Diamond Dawgs...")
-total = len(MSU_PLAYERS)
-
-for i, (player_name, player_id) in enumerate(MSU_PLAYERS):
-    progress.progress((i + 1) / total, text=f"Checking {player_name}...")
+def fetch_player(player_name: str, player_id: int):
+    """Fetch stats for one player. Returns (name, last_name, level, df) or None."""
     stats_df, current_level = get_stats(player_id)
     if stats_df is not None and not stats_df.empty:
         last_name = player_name.split()[-1]
-        results.append((player_name, last_name, current_level, stats_df))
+        return (player_name, last_name, current_level, stats_df)
+    return None
 
-progress.empty()
+
+with st.spinner("Loading Diamond Dawgs..."):
+    # Fetch all players in parallel rather than sequentially
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        futures = [
+            executor.submit(fetch_player, name, pid)
+            for name, pid in MSU_PLAYERS
+        ]
+        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+# Filter out players with no stats
+results = [r for r in results if r is not None]
 
 if not results:
     st.info("No active stats found for any Diamond Dawg at this time.")
 else:
-    # Sort: MLB first, then by level, then alphabetically by last name within each level
+    # Sort: MLB first, then by level, then alphabetically by last name within level
     results.sort(key=lambda r: (LEVEL_ORDER.get(r[2], 99), r[1]))
 
     st.success(f"Found {len(results)} active Diamond Dawgs.")
