@@ -8,6 +8,7 @@ import urllib.request
 import json
 import pandas as pd
 import concurrent.futures
+import streamlit as st
 
 
 def fetch_stats(url: str):
@@ -31,8 +32,7 @@ def _savant_url(game_pk: int, date_short: str) -> str:
 def format_hitting_stats(splits: list, season_stat: dict) -> pd.DataFrame:
     """Format the 7 most recent game logs + a season total row for a hitter."""
     splits.sort(key=lambda x: x['date'], reverse=True)
-    recent_7 = splits[:7]
-    recent_7.reverse()  # chronological order
+    recent_7 = splits[:7]  # most recent first
 
     rows = []
     for game in recent_7:
@@ -93,8 +93,7 @@ def format_hitting_stats(splits: list, season_stat: dict) -> pd.DataFrame:
 def format_pitching_stats(splits: list, season_stat: dict) -> pd.DataFrame:
     """Format the 7 most recent game logs + a season total row for a pitcher."""
     splits.sort(key=lambda x: x['date'], reverse=True)
-    recent_7 = splits[:7]
-    recent_7.reverse()
+    recent_7 = splits[:7]  # most recent first
 
     rows = []
     for game in recent_7:
@@ -166,6 +165,7 @@ LEVEL_ORDER = {
 }
 
 
+@st.cache_data(ttl=3600)
 def get_stats(player_id: int) -> tuple:
     """
     Fetch 2026 regular-season game logs and season stats for the given player.
