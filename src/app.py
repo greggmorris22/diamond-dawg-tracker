@@ -53,10 +53,11 @@ def fetch_player(player_name: str, player_id: int, draft_class: int):
 with st.spinner("Loading Diamond Dawgs..."):
     # Fetch all players in parallel rather than sequentially
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-        futures = [
-            executor.submit(fetch_player, row[0], row[1], row[2])
-            for row in MSU_PLAYERS
-        ]
+        futures = []
+        for row in MSU_PLAYERS:
+            # Fallback for Streamlit Cloud hot-reload caching the old module format momentarily
+            draft_class = row[2] if len(row) >= 3 else 0
+            futures.append(executor.submit(fetch_player, row[0], row[1], draft_class))
         all_results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
 # Sort alphabetically by last name for dropdown purposes
