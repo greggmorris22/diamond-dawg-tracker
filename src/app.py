@@ -15,10 +15,6 @@ st.markdown(
     "have played in 2026. Sorted by level and alphabetically by last name."
 )
 
-# Column config shared by all stat tables. Renders the Date column as a
-# clickable link to the Baseball Savant gamefeed. The URL has the short date
-# embedded as &d=MM-DD so the regex can extract it for display. The Season
-# aggregate row has an empty URL and renders as a blank cell.
 STAT_COLUMN_CONFIG = {
     "Date": st.column_config.LinkColumn(
         "Date",
@@ -26,41 +22,116 @@ STAT_COLUMN_CONFIG = {
     )
 }
 
+def fetch_player(player_name: str, player_id: int, draft_class: int):
+    """Fetch stats for one player. Returns a dict with all necessary state."""
+    gl_df, ss_df, current_level, is_pitcher = get_stats(player_id)
+    has_stats = gl_df is not None and not gl_df.empty
+    
+    parts = player_name.split()
+    last_name = parts[-1]
+    first_name = " ".join(parts[:-1])
+    
+    if has_stats:
+        dropdown_name = f"{first_name} {last_name}"
+    else:
+        # User requested to see them but visually greyed out / unselectable
+        # Best approximation in purely native Streamlit selectbox:
+        dropdown_name = f"{first_name} {last_name} (No 2026 Stats)"
 
-def fetch_player(player_name: str, player_id: int):
-    """Fetch stats for one player. Returns (name, last_name, level, df) or None."""
-    stats_df, current_level = get_stats(player_id)
-    if stats_df is not None and not stats_df.empty:
-        last_name = player_name.split()[-1]
-        return (player_name, last_name, current_level, stats_df)
-    return None
-
+    return {
+        "name": player_name,
+        "last_name": last_name,
+        "dropdown_name": dropdown_name,
+        "draft_class": draft_class,
+        "has_stats": has_stats,
+        "gl_df": gl_df,
+        "ss_df": ss_df,
+        "level": current_level,
+        "is_pitcher": is_pitcher
+    }
 
 with st.spinner("Loading Diamond Dawgs..."):
     # Fetch all players in parallel rather than sequentially
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
         futures = [
-            executor.submit(fetch_player, name, pid)
-            for name, pid in MSU_PLAYERS
+            executor.submit(fetch_player, row[0], row[1], row[2])
+            for row in MSU_PLAYERS
         ]
-        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+        all_results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
-# Filter out players with no stats
-results = [r for r in results if r is not None]
+# Sort alphabetically by last name for dropdown purposes
+all_results.sort(key=lambda r: r["last_name"])
 
-if not results:
-    st.info("No active stats found for any Diamond Dawg at this time.")
+# --- FILTERS ---
+st.divider()
+col1, col2 = st.columns(2)
+
+# Draft Class Filter
+draft_years = sorted(list(set(p[2] for p in MSU_PLAYERS)), reverse=True)
+draft_options = ["All"] + draft_years
+
+with col1:
+    selected_draft_class = st.selectbox("Filter by Draft Class", options=draft_options)
+
+# Filter the list by Draft Class first
+if selected_draft_class == "All":
+    filtered_results = all_results
 else:
-    # Sort: MLB first, then by level, then alphabetically by last name within level
-    results.sort(key=lambda r: (LEVEL_ORDER.get(r[2], 99), r[1]))
+    filtered_results = [r for r in all_results if r["draft_class"] == selected_draft_class]
 
-    st.success(f"Found {len(results)} active Diamond Dawgs.")
+active_count = sum(1 for r in filtered_results if r["has_stats"])
+player_options = [f"All ({active_count})"] + [r["dropdown_name"] for r in filtered_results]
 
-    for player_name, _, current_level, stats_df in results:
-        st.subheader(f"{player_name}  —  {current_level}")
+# Player Filter
+with col2:
+    selected_player = st.selectbox("Filter by Player", options=player_options)
+
+st.divider()
+
+# --- DISPLAY MATCHING PLAYERS ---
+# Filter by selected player
+if selected_player.startswith("All"):
+    # Show only active players if 'All' is selected
+    display_results = [r for r in filtered_results if r["has_stats"]]
+else:
+    # Find the specific player selected
+    display_results = [r for r in filtered_results if r["dropdown_name"] == selected_player]
+
+if not display_results:
+    if selected_player.startswith("All"):
+        st.info("No active stats found for this filter combination at this time.")
+    else:
+        st.info("This player has not recorded any stats yet for the 2026 season.")
+else:
+    # Sort active players: MLB first, then by level, then alphabetically by last name within level
+    display_results.sort(key=lambda r: (LEVEL_ORDER.get(r["level"], 99), r["last_name"]))
+
+    if selected_player.startswith("All"):
+        st.success(f"Found {len(display_results)} active Diamond Dawgs.")
+
+    for r in display_results:
+        # If user explicitly selected an inactive player, it gets caught above in `if not display_results`.
+        # Just a safety check here:
+        if not r["has_stats"]:
+            st.info(f"{r['name']} has not recorded any stats yet for the 2026 season.")
+            continue
+            
+        st.subheader(f"{r['name']}  —  {r['level']}")
+        
+        # 1. Season Stats Section (Above Game Logs)
+        st.markdown("**2026 Season Stats**")
         st.dataframe(
-            stats_df,
+            r["ss_df"],
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        # 2. Recent Game Logs
+        st.markdown("**Recent Game Logs**")
+        st.dataframe(
+            r["gl_df"],
             use_container_width=True,
             hide_index=True,
             column_config=STAT_COLUMN_CONFIG
         )
+        st.write("") # small spacer

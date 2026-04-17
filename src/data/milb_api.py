@@ -29,10 +29,10 @@ def _savant_url(game_pk: int, date_short: str) -> str:
     return f"https://baseballsavant.mlb.com/gamefeed?gamePk={game_pk}&d={date_short}"
 
 
-def format_hitting_stats(splits: list, season_stat: dict) -> pd.DataFrame:
-    """Format the 7 most recent game logs + a season total row for a hitter."""
+def format_hitting_game_logs(splits: list) -> pd.DataFrame:
+    """Format the 7 most recent game logs for a hitter."""
     splits.sort(key=lambda x: x['date'], reverse=True)
-    recent_7 = splits[:7]  # most recent first
+    recent_7 = splits[:7]
 
     rows = []
     for game in recent_7:
@@ -75,25 +75,13 @@ def format_hitting_stats(splits: list, season_stat: dict) -> pd.DataFrame:
             "SAC": s.get('sacBunts', 0),
             "SF":  s.get('sacFlies', 0),
         })
-
-    s = season_stat if season_stat else {}
-    rows.append({
-        "Date": "", "Lvl": "-", "Team": "-", "OPP": "-",
-        "AB": s.get('atBats', 0), "R": s.get('runs', 0), "H": s.get('hits', 0),
-        "TB": s.get('totalBases', 0), "2B": s.get('doubles', 0), "3B": s.get('triples', 0),
-        "HR": s.get('homeRuns', 0), "RBI": s.get('rbi', 0), "BB": s.get('baseOnBalls', 0),
-        "IBB": s.get('intentionalWalks', 0), "SO": s.get('strikeOuts', 0),
-        "SB": s.get('stolenBases', 0), "CS": s.get('caughtStealing', 0),
-        "AVG": s.get('avg', '.000'), "OBP": s.get('obp', '.000'), "SLG": s.get('slg', '.000'),
-        "HBP": s.get('hitByPitch', 0), "SAC": s.get('sacBunts', 0), "SF": s.get('sacFlies', 0),
-    })
     return pd.DataFrame(rows)
 
 
-def format_pitching_stats(splits: list, season_stat: dict) -> pd.DataFrame:
-    """Format the 7 most recent game logs + a season total row for a pitcher."""
+def format_pitching_game_logs(splits: list) -> pd.DataFrame:
+    """Format the 7 most recent game logs for a pitcher."""
     splits.sort(key=lambda x: x['date'], reverse=True)
-    recent_7 = splits[:7]  # most recent first
+    recent_7 = splits[:7]
 
     rows = []
     for game in recent_7:
@@ -133,26 +121,125 @@ def format_pitching_stats(splits: list, season_stat: dict) -> pd.DataFrame:
             "AVG":  s.get('avg', '.000'),
             "WHIP": s.get('whip', '0.00'),
         })
-
-    s = season_stat if season_stat else {}
-    rows.append({
-        "Date": "", "Lvl": "-", "Team": "-", "OPP": "-",
-        "W": s.get('wins', 0), "L": s.get('losses', 0), "ERA": s.get('era', '0.00'),
-        "G": s.get('gamesPlayed', 0), "GS": s.get('gamesStarted', 0),
-        "CG": s.get('completeGames', 0), "SHO": s.get('shutouts', 0),
-        "SV": s.get('saves', 0), "SVO": s.get('saveOpportunities', 0),
-        "IP": s.get('inningsPitched', '0.0'), "H": s.get('hits', 0),
-        "R": s.get('runs', 0), "ER": s.get('earnedRuns', 0), "HR": s.get('homeRuns', 0),
-        "HB": s.get('hitBatsmen', 0), "BB": s.get('baseOnBalls', 0),
-        "IBB": s.get('intentionalWalks', 0), "SO": s.get('strikeOuts', 0),
-        "NP-S": f"{s.get('numberOfPitches', 0)}-{s.get('strikes', 0)}",
-        "AVG": s.get('avg', '.000'), "WHIP": s.get('whip', '0.00'),
-    })
     return pd.DataFrame(rows)
 
 
-# Priority order for display: MLB first, then down through the minors.
-# The Lvl abbreviations come from sport.abbreviation in the API response.
+def format_hitting_season_stats(s: dict) -> pd.DataFrame:
+    """Format the advanced season stats for a hitter."""
+    # Hitters: PA, BB%, K%, AVG, OBP, SLG, ISO, BABIP, HR, R, RBI, SB
+    pa = s.get('plateAppearances', 0)
+    bb = s.get('baseOnBalls', 0)
+    so = s.get('strikeOuts', 0)
+    h = s.get('hits', 0)
+    hr = s.get('homeRuns', 0)
+    ab = s.get('atBats', 0)
+    sf = s.get('sacFlies', 0)
+    
+    if pa == 0:
+        pa = ab + bb + s.get('hitByPitch', 0) + sf + s.get('sacBunts', 0)
+
+    bb_pct = f"{(bb / pa * 100):.1f}%" if pa > 0 else "0.0%"
+    k_pct = f"{(so / pa * 100):.1f}%" if pa > 0 else "0.0%"
+    
+    avg = s.get('avg', '.000')
+    obp = s.get('obp', '.000')
+    slg = s.get('slg', '.000')
+    
+    try:
+        iso_val = float(slg) - float(avg)
+        iso = f"{iso_val:.3f}".lstrip('0')
+        if iso.startswith('-'):
+            iso = '.000'
+    except ValueError:
+        iso = ".000"
+        
+    babip = s.get('babip', '.000')
+    if babip == '.000' and (ab - so - hr + sf) > 0:
+        babip_val = (h - hr) / (ab - so - hr + sf)
+        babip = f"{babip_val:.3f}".lstrip('0')
+
+    row = {
+        "PA": pa,
+        "BB%": bb_pct,
+        "K%": k_pct,
+        "AVG": avg,
+        "OBP": obp,
+        "SLG": slg,
+        "ISO": iso,
+        "BABIP": babip,
+        "HR": hr,
+        "R": s.get('runs', 0),
+        "RBI": s.get('rbi', 0),
+        "SB": s.get('stolenBases', 0)
+    }
+    return pd.DataFrame([row])
+
+
+def format_pitching_season_stats(s: dict) -> pd.DataFrame:
+    """Format the advanced season stats for a pitcher."""
+    # Pitchers: IP, K, K%, BB%, K-BB%, WHIP, ERA, FIP, AVG, BABIP, LOB%
+    ip = s.get('inningsPitched', '0.0')
+    bfp = s.get('battersFaced', 0)
+    so = s.get('strikeOuts', 0)
+    bb = s.get('baseOnBalls', 0)
+    hr = s.get('homeRuns', 0)
+    hbp = s.get('hitBatsmen', 0)
+    h = s.get('hits', 0)
+    r = s.get('runs', 0)
+    ab = s.get('atBats', 0)
+    sf = s.get('sacFlies', 0)
+
+    # Calculate IP float (e.g. 1.1 -> 1.333)
+    try:
+        ip_parts = str(ip).split('.')
+        ip_float = int(ip_parts[0]) + (int(ip_parts[1]) / 3.0 if len(ip_parts)>1 else 0)
+    except ValueError:
+        ip_float = 0.0
+
+    k_pct_val = (so / bfp * 100) if bfp > 0 else 0
+    bb_pct_val = (bb / bfp * 100) if bfp > 0 else 0
+    k_minus_bb_val = k_pct_val - bb_pct_val
+
+    k_pct = f"{k_pct_val:.1f}%"
+    bb_pct = f"{bb_pct_val:.1f}%"
+    k_minus_bb = f"{k_minus_bb_val:.1f}%"
+    
+    # FIP
+    fip = "0.00"
+    if ip_float > 0:
+        fip_val = ((13 * hr + 3 * (bb + hbp) - 2 * so) / ip_float) + 3.20
+        fip = f"{fip_val:.2f}"
+        
+    # BABIP
+    babip = ".000"
+    babip_denom = ab - so - hr + sf
+    if babip_denom > 0:
+        babip_val = (h - hr) / babip_denom
+        babip = f"{babip_val:.3f}".lstrip('0')
+        
+    # LOB%
+    lob = "0.0%"
+    lob_denom = h + bb + hbp - 1.4 * hr
+    if lob_denom > 0:
+        lob_val = (h + bb + hbp - r) / lob_denom
+        lob = f"{(lob_val * 100):.1f}%"
+
+    row = {
+        "IP": ip,
+        "K": so,
+        "K%": k_pct,
+        "BB%": bb_pct,
+        "K-BB%": k_minus_bb,
+        "WHIP": s.get('whip', '0.00'),
+        "ERA": s.get('era', '0.00'),
+        "FIP": fip,
+        "AVG": s.get('avg', '.000'),
+        "BABIP": babip,
+        "LOB%": lob
+    }
+    return pd.DataFrame([row])
+
+
 LEVEL_ORDER = {
     "MLB": 0,
     "AAA": 1,
@@ -169,21 +256,12 @@ LEVEL_ORDER = {
 def get_stats(player_id: int) -> tuple:
     """
     Fetch 2026 regular-season game logs and season stats for the given player.
-    Covers MLB (sportId=1) and all MiLB levels (11-17).
-
-    Returns (df, current_level) where current_level is the sport abbreviation
-    of the player's most recent game (used for sorting in the app).
-    Returns (None, None) if the player has no 2026 regular-season stats.
-
-    sport_ids:
-        1  = MLB
-        11 = AAA, 12 = AA, 13 = A+, 14 = A,
-        15 = Rookie Complex, 16 = DSL, 17 = VSL
+    Returns (game_log_df, season_stats_df, current_level, is_pitcher).
     """
     profile_url = f"https://statsapi.mlb.com/api/v1/people/{player_id}"
     profile = fetch_stats(profile_url)
     if not profile or not profile.get('people'):
-        return None, None
+        return None, None, None, None
 
     pos_code = profile['people'][0].get('primaryPosition', {}).get('code', '')
     is_pitcher = (pos_code == '1')
@@ -212,19 +290,36 @@ def get_stats(player_id: int) -> tuple:
                         all_splits.extend(block['splits'])
                     elif block['type']['displayName'] == 'season' and block.get('splits'):
                         new_stat = block['splits'][0].get('stat', {})
+                        # Find the stat block with the most PA/IP
                         ab = new_stat.get('atBats', 0)
                         ip = new_stat.get('inningsPitched', '0.0')
-                        if ab > best_season_stat.get('atBats', 0) or ip > best_season_stat.get('inningsPitched', '0.0'):
+                        
+                        try:
+                            ip_parts = str(ip).split('.')
+                            ip_float = int(ip_parts[0]) + (int(ip_parts[1]) / 3.0 if len(ip_parts)>1 else 0)
+                        except: ip_float = 0
+                        
+                        try:
+                            best_ip_parts = str(best_season_stat.get('inningsPitched', '0.0')).split('.')
+                            best_ip_float = int(best_ip_parts[0]) + (int(best_ip_parts[1]) / 3.0 if len(best_ip_parts)>1 else 0)
+                        except: best_ip_float = 0
+
+                        if ab > best_season_stat.get('atBats', 0) or ip_float > best_ip_float:
                             best_season_stat = new_stat
 
     if not all_splits:
-        return None, None
+        return None, None, None, None
 
-    # Determine current level from the most recent game
     all_splits.sort(key=lambda x: x['date'], reverse=True)
     current_level = all_splits[0].get('sport', {}).get('abbreviation', 'UNK')
 
+    s_stat = best_season_stat if best_season_stat else {}
+
     if is_pitcher:
-        return format_pitching_stats(all_splits, best_season_stat), current_level
+        gl_df = format_pitching_game_logs(all_splits)
+        ss_df = format_pitching_season_stats(s_stat)
     else:
-        return format_hitting_stats(all_splits, best_season_stat), current_level
+        gl_df = format_hitting_game_logs(all_splits)
+        ss_df = format_hitting_season_stats(s_stat)
+
+    return gl_df, ss_df, current_level, is_pitcher
