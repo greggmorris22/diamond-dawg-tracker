@@ -120,7 +120,7 @@ else:
         st.subheader(f"{r['name']}  —  {r['level']}")
         
         # 1. Season Stats Section (Above Game Logs)
-        st.markdown("**2026 Season Stats**")
+        st.markdown("**2026 Stats**")
         st.dataframe(
             r["ss_df"],
             use_container_width=True,
